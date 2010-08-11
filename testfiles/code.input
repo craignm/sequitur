@@ -1,0 +1,309 @@
+/********************************************************************************
+
+ classes.cc - Module containing (part of the) methods of 'rules' and 'symbols'
+              classes, and functions for working with the hash table of digrams
+              printing out the grammar.
+              
+ Notes:
+    For the rest of 'symbols' and 'rules' methods, see classes.h .
+
+ ********************************************************************************/
+
+#include "classes.h"
+#include <ctype.h>
+
+extern int num_rules, delimiter, do_uncompress;    // see sequitur.cc for explanation of these
+
+rules::rules() {
+  num_rules ++;
+  guard = new symbols(this);
+  guard->point_to_self();
+  count = number = Usage = 0;
+}
+
+rules::~rules() { 
+  num_rules --;
+  delete guard;
+}
+
+symbols *rules::first() { return guard->next(); }   // pointer to first symbol of rule's right hand
+symbols *rules::last()  { return guard->prev(); }   // pointer to last symbol of rule's right hand
+
+// ***********************************************************************************
+// symbols::check()
+//    check digram made of this symbol and the symbol following it,
+//    and enforce Sequitur constraints.
+//
+// Return values
+//    0 : did not change the grammar (there was no violation of contraints)
+//    1 : did change the grammar (there were violations of contraints)
+//
+// Global variables used
+//    K (minimum number of times a digram must occur to form rule)
+// ***********************************************************************************
+int symbols::check() {
+  if (is_guard() || n->is_guard()) return 0;
+
+  symbols **x = find_digram(this);
+  if (!x) return 0;    // if either symbol of the digram is a delimiter -> do nothing
+  symbols *y[100];
+  int i;
+
+  for (i = 0; i < K; i ++) y[i] = x[i];
+  
+  // if digram is not yet in the hash table -> put it there, and return
+  for (i = 0; i < K; i ++)
+    if (int(x[i]) <= 1) {
+      x[i] = this;
+      return 0;
+    }
+  
+  // if repetitions overlap -> do nothing
+  for (i = 0; i < K; i ++) 
+    if (x[i]->next() == this || next() == x[i])
+      return 0;
+  
+  rules *r;
+  
+  // reuse an existing rule
+  
+  for (i = 0; i < K; i ++)
+    if (y[i]->prev()->is_guard() && y[i]->next()->next()->is_guard()) {
+      r = y[i]->prev()->rule();
+      substitute(r); 
+      
+      // check for an underused rule
+
+      if (r->first()->nt() && r->first()->rule()->freq() == 1) r->first()->expand();
+      // if (r->last()->nt() && r->last()->rule()->freq() == 1) r->last()->expand();
+
+      return 1;
+    }
+
+  // create a new rule
+  
+  r = new rules;
+
+  if (nt()) 
+    r->last()->insert_after(new symbols(rule()));
+  else 
+    r->last()->insert_after(new symbols(value()));
+
+  if (next()->nt()) 
+    r->last()->insert_after(new symbols(next()->rule()));
+  else
+    r->last()->insert_after(new symbols(next()->value()));
+  
+  x[0] = r->first();
+  
+  for (i = 0; i < K; i ++) {
+    y[i]->substitute(r);
+    y[i] = (symbols *) 1; // should be x
+  }
+  
+  substitute(r);
+  
+  // check for an underused rule
+  
+  if (r->first()->nt() && r->first()->rule()->freq() == 1) r->first()->expand();
+  //  if (r->last()->nt() && r->last()->rule()->freq() == 1) r->last()->expand();
+  
+  return 1;
+}
+
+// ***********************************************************************************
+// symbols::expand()
+//    This symbol is the last reference to its rule. It is deleted, and the
+//    contents of the rule substituted in its place.
+// ***********************************************************************************
+void symbols::expand() {
+  symbols *left = prev();
+  symbols *right = next();
+  symbols *f = rule()->first();
+  symbols *l = rule()->last();
+
+/////////
+  extern bool compression_initialized;
+  if (!compression_initialized) {
+    int i = 0;
+    symbols *s;
+    extern int max_rule_len;
+    // first calculate length of this rule (the one we are adding symbols to)
+    s = next();    // symbol 'this' should not be counted because it will be deleted
+    do {
+       if (!s->is_guard()) i++;
+       s = s->next();
+    } while(s != this);
+    // then calculate length of what is to be added
+    for (s = f; !s->is_guard(); s = s->next()) i++;
+    if (i > max_rule_len) max_rule_len = i;
+  }
+/////////
+  
+  symbols **m = find_digram(this);
+  if (!m) return;
+  delete rule();
+  
+  for (int i = 0; i < K; i ++)
+    if (m[i] == this) m[i] = (symbols *) 1;
+
+  s = 0; // if we don't do this, deleting the symbol tries to deuse the rule!
+
+  delete this;
+
+  join(left, f);
+  join(l, right);
+
+  *find_digram(l) = l;
+}
+
+// ***********************************************************************************
+// symbols::substitute(rules *r)
+//    Replace digram made up of this symbol and the symbol following it with
+//    a non-terminal, which points to rule "r" (parameter).
+// ***********************************************************************************
+void symbols::substitute(rules *r)
+{
+  symbols *q = p;
+  
+  delete q->next();
+  delete q->next();
+
+  q->insert_after(new symbols(r));
+
+  if (!q->check()) q->next()->check();
+}
+
+
+// ***********************************************************************************
+// Hash table functions
+//
+//     Handle the hash table of digrams.
+// ***********************************************************************************
+
+// pick a prime! (large enough to hold every digram in the grammar, with room
+// to spare
+
+// #define PRIME 1000003
+// #define PRIME 2000003
+#define PRIME 4265561
+// #define PRIME 12454987
+// #define PRIME 24909791
+// #define PRIME 62265551
+
+// Standard open addressing or double hashing. See Knuth.
+
+#define HASH(one, two) (((one) << 16 | (two)) % PRIME)
+#define HASH2(one) (17 - ((one) % 17))
+
+symbols **table = 0;
+
+// ******************************************************************************
+// symbols **find_digram(symbols *s)
+//
+//     Search hash table for digram made of symbols s->value() and
+//     s->next()->value().
+//
+// Return value
+//     - if digram found : Pointer to hash table element where digram is stored.
+//     - otherwise       : 0
+//
+// Global variables used
+//    delimiter  (symbol accross which not to form rules, see sequitur.cc)
+// *******************************************************************************
+symbols **find_digram(symbols *s)
+{
+  if (!table) {
+    table = (symbols **) malloc(PRIME * K * sizeof(symbols *));
+    memset(table, 0, PRIME * K * sizeof(symbols *));
+  }
+
+  ulong one = s->raw_value();
+  ulong two = s->next()->raw_value();
+
+  if (one == delimiter || two == delimiter) return 0;
+
+  int jump = HASH2(one) * K;
+  int insert = -1;
+  int i = HASH(one, two) * K;
+
+  while (1) {
+    symbols *m = table[i];
+    if (!m) {
+      if (insert == -1) insert = i;
+      return &table[insert];
+    } 
+    else if (int(m) == 1) insert = i;
+    else if (m->raw_value() == one && m->next()->raw_value() == two) return &table[i];
+    i = (i + jump) % PRIME;
+  }
+}
+
+// ***********************************************************************************
+// rules::reproduce()
+//    Reproduce full expansion of a rule.
+// ***********************************************************************************
+void rules::reproduce()
+{
+  // for each symbol of the rule, call symbols::reproduce()!
+  for (symbols *p = first(); !p->is_guard(); p = p->next())
+    p->reproduce();
+}
+
+
+// ***********************************************************************************
+// Overload operator << to write symbols of the grammar to streams,
+//    in a formatted manner.
+// ***********************************************************************************
+ostream &operator << (ostream &o, symbols &s)
+{
+  extern int numbers;
+
+  if (s.nt())
+     o << s.rule()->index();
+  else if (numbers & do_uncompress) o << s.value() << endl;
+  else if (numbers) o << '&' << s.value();
+  else if (do_uncompress) o << char(s.value());
+  else if (s.value() == '\n') o << "\\n";
+  else if (s.value() == '\t') o << "\\t";
+  else if (s.value() == ' ' ) o << '_';
+  else if (s.value() == '\\' ||
+       s.value() == '(' ||
+       s.value() == ')' ||
+       s.value() == '_' ||
+       isdigit(s.value()))
+    o << '\\' << char(s.value());
+  else o << char(s.value());
+
+  return o;
+}
+
+// ***********************************************************************************
+// rules::output()
+//    Print right hand of this rule. If right hand contains non-terminals, descend
+//    recursively and print right hands of subordinated rules, if these have not
+//    been printed out yet.
+//
+//    Also, numbers the rule, which will indicate that right hand has been printed out.
+//
+// Global variables used
+//    current_rule, print_rule_usage
+// ***********************************************************************************
+void rules::output() 
+{
+  symbols *s;
+  
+  for (s = first(); !s->is_guard(); s = s->next())
+     if (s->nt() && s->rule()->index() == 0)
+        s->rule()->output();
+
+  number = current_rule ++;
+
+  for (s = first(); !s->is_guard(); s = s->next())
+    cout << *s << ' ';
+
+  extern int print_rule_usage;
+  if (print_rule_usage) cout << "\t(" << Usage << ")";
+  
+  cout << endl;
+}

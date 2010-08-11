@@ -1,0 +1,85 @@
+Type "sequitur -h" for a list of command-line options.
+
+To get the basic idea of operation and the algorithm (on Unix):
+$ echo -n abcdbcabcdbc | ./sequitur -p
+
+To compress and decompress:
+$ sequitur -c < input > compressed
+$ sequitur -u < compressed > uncompressed
+
+Here are some notes, and credits to those who have helped refine
+the code:
+
+______________________________________________________________________
+
+December 2004:
+
+I have added test.pl to provide a suite of minimal regression tests.
+
+______________________________________________________________________
+
+June 2004:
+
+Roberto Maglica (romag@email.si) ported sequitur to Windows using the
+Windows port of gcc 2.95-2, and cleaned up much of the code. He did this as
+part of his BSc graduation thesis "Stiskanje podatkov z metodo Sequitur"
+("Data Compression Using the Sequitur Method"), submitted to the Faculty of
+Computer and Information Science, Ljubljana, Slovenia
+http://www.fri.uni-lj.si
+
+Roberto's comments here:
+
+- setting binary-mode input/output when working on the Windows platform.
+Unlike Unix, binary mode is not the default on Windows, so we have to
+explicitly set it in order to correctly read and write data.
+
+- module getopt.c, which contains the getopt() command-line parsing
+function, again to use with Windows.
+
+- fixed bug with -f ("memory limit") option. It can happen that when we
+have to output a non-terminal for the first time, this non-terminal is
+used only once in the right-hand sides of the rules. As it is being
+output for the first time, we have to output the rule definition (its
+right-hand side). The bug was that the program output a code for the
+non-terminal, not the rule definition.
+
+- possibility to have more than 256 terminal symbols. I did this by
+differently arranging codes in the 'symbol' context (compress.cc
+module). The first few codes (0,1,...) are used for special symbols like
+START_RULE, END_OF_FILE, etc., then odd numbers are assigned to terminal
+symbols, and even numbers to non-terminal symbols.
+
+- a few optimizations to reduce the size of the output. These include:
+
+  + recording the least and the greatest terminal symbol, so in the
+    compression module we know which range terminal symbols are in,
+    insert only symbols from that range into the "symbol" context,
+    which results in using fewer bits to code them
+
+  + recording maximal rule length (no MAX_LENGTH constant), and symbols
+    0 and 1 are not inserted into the "lengths" context, because we
+    don't have rules 0 characters or 1 character long; reason, same as
+    above
+
+  + if we did not use -f, create "symbol" and "lengths" contexts as
+    static. Using a static context, rather than dynamic, for the same
+    set of symbols, results in fewer bits being used.
+
+  The gain from these optimizations is small -- typically, 0.5% of the
+  length of the uncompressed data. However, it is present.
+
+There are still issues to be resolved. For example, using the -k option
+crashes the program on my system almost every time -- I have not
+investigated this.
+
+______________________________________________________________________
+
+Richard O'Keefe <ok@cs.otago.ac.nz> uses Linux on an UltraSPARC. He has made
+many helpful comments to clean up my non-portable code. The modifications
+that I didn't implement because they don't work on RedHat Linux are:
+
+- change $(CC) to $(CCC) in the Makefile, except for the .c files
+- Change "-lstdc++" to "$(LIBS)" and define LIBS=
+
+______________________________________________________________________
+
