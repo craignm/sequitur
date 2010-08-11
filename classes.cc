@@ -181,8 +181,11 @@ void symbols::expand() {
   join(left, f);
   join(l, right);
 
-  *find_digram(l) = l;
-  occupied ++;
+  symbols **ll = find_digram(l);
+  if (ll) {
+    *ll = l;
+    occupied ++;
+  }
 }
 
 // ***************************************************************************

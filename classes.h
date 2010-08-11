@@ -120,15 +120,22 @@ public:
       if (right->p && right->n &&
           right->value() == right->p->value() &&
           right->value() == right->n->value()) {
-        *find_digram(right) = right;
-	occupied ++;
+        assert(find_digram(right));
+        symbols **r = find_digram(right);
+        if (r) { // necessary when using delimiters
+          *r = right;
+          occupied ++;
+        }
       }
 
       if (left->p && left->n &&
           left->value() == left->n->value() &&
           left->value() == left->p->value()) {
-        *find_digram(left->p) = left->p;
-	occupied ++;
+        symbols **lp = find_digram(left->p);
+        if (lp) { // necessary when using delimiters
+          *lp = left->p;
+          occupied ++;
+        }
       }
     }
     left->n = right; right->p = left;
