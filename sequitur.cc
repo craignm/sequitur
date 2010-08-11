@@ -195,7 +195,7 @@ int main(int argc, char **argv)
     if (++ chars % 1000000 == 0 && !quiet) {
       struct tms buffer;
       extern int collisions, lookups, occupancy;//, occ[100];
-  
+
       ftime(&tp);
       int milliseconds =  tp.time * 1000 + tp.millitm;
 

@@ -81,8 +81,13 @@ public:
 
   // print out symbol, or, if it is non-terminal, rule's full expansion
   void reproduce() {
+    extern int numbers;
+
     if (non_terminal()) rule()->reproduce();
-    else cout << *this;
+    else {
+      cout << *this;
+      if (numbers) cout << ' ';
+    }
   }
 
   // initializes a new terminal symbol
