@@ -11,7 +11,7 @@ getopts("f:e:1h");
 if (!$opt_f || $opt_h) {
     print <<END;
 
-tokenize.pl
+line_sequitur.pl
 -----------
 
 -f <file>    input file
