@@ -113,7 +113,7 @@ Symbol.prototype.join = function(right) {
     if (this.prev && this.next &&
 	this.value() == this.next.value() &&
 	this.value() == this.prev.value()) {
-      digramIndex[this.hashValue()] = this;
+      digramIndex[this.prev.hashValue()] = this.prev;
     }
   }
   this.next = right;
