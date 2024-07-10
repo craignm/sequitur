@@ -3,17 +3,17 @@
 # Ported by Ravi Annaswamy 2 hours on May 8, 2013
 # Not fully tested yet :)
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#     http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 class Rule:
 
@@ -84,13 +84,13 @@ class Symbol:
     return sym
 
   def join(self, left, right):
-    if left.n <> None:
+    if left.n != None:
       left.delete_digram()
-      if (right.p <> None and right.n <> None and
+      if (right.p != None and right.n != None and
           right.value == right.p.value and
           right.value == right.n.value):
         digrams[str(right.value) + str(right.n.value)] = right
-      if (left.p <> None and left.n <> None and
+      if (left.p != None and left.n != None and
           left.value == left.p.value and
           left.value == left.n.value):
         digrams[str(left.p.value) + str(left.value)] = left.p
@@ -127,7 +127,7 @@ class Symbol:
       return False
 
     found = digrams[self.digram()]
-    if found.n <> self:
+    if found.n != self:
       self.match(self, found)
     return True
 
