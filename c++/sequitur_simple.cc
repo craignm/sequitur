@@ -48,14 +48,14 @@ public:
 
 class symbols {
   symbols *n, *p;
-  ulong s;
+  unsigned long s;
 
  public:
 
   // initializes a new symbol. If it is non-terminal, increments the reference
   // count of the corresponding rule
 
-  symbols(ulong sym) {
+  symbols(unsigned long sym) {
     s = sym * 2 + 1;
     // an odd number, so that they're distinct from the rule pointers, which
     // we assume are 4-byte aligned
@@ -63,7 +63,7 @@ class symbols {
   }
 
   symbols(rules *r) {
-    s = (ulong) r;
+    s = (unsigned long) r;
     p = n = 0;
     rule()->reuse();
   }
@@ -132,8 +132,8 @@ class symbols {
 
   symbols *next() { return n;};
   symbols *prev() { return p;};
-  inline ulong raw_value() {  return s; };
-  inline ulong value() { return s / 2;};
+  inline unsigned long raw_value() {  return s; };
+  inline unsigned long value() { return s / 2;};
 
   // assuming this is a non-terminal, rule() returns the corresponding rule
 
@@ -148,12 +148,12 @@ class symbols {
   int check() {
     if (is_guard() || n->is_guard()) return 0;
     symbols **x = find_digram(this);
-    if (ulong(*x) <= 1) {
+    if ((unsigned long)(*x) <= 1) {
       *x = this;
       return 0;
     }
 
-    if (ulong(*x) > 1 && (*x)->next() != this) match(this, *x);
+    if ((unsigned long)(*x) > 1 && (*x)->next() != this) match(this, *x);
     return 1;
   }
 
@@ -164,7 +164,7 @@ class symbols {
 
 rules S;
 
-main()
+int main()
 {
   S.last()->insert_after(new symbols(cin.get()));
   int x = 0;
@@ -177,6 +177,8 @@ main()
 
   void print();
   print();
+  
+  return 0;
 }
 
 int num_rules = 0;
@@ -282,8 +284,8 @@ symbols *table[PRIME];
 
 symbols **find_digram(symbols *s)
 {
-  ulong one = s->raw_value();
-  ulong two = s->next()->raw_value();
+  unsigned long one = s->raw_value();
+  unsigned long two = s->next()->raw_value();
 
   int jump = HASH2(one);
   int insert = -1;
@@ -295,7 +297,7 @@ symbols **find_digram(symbols *s)
       if (insert == -1) insert = i;
       return &table[insert];
     }
-    else if (ulong(m) == 1) insert = i;
+    else if ((unsigned long)(m) == 1) insert = i;
     else if (m->raw_value() == one && m->next()->raw_value() == two)
       return &table[i];
     i = (i + jump) % PRIME;
